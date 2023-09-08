@@ -20,7 +20,7 @@ class geoServiceTest {
 
     GeoService geoService = new GeoServiceImpl();
 
-    private static Stream<Arguments> arguments() {
+    private static Stream<Arguments> argumentsForByIp() {
         return Stream.of(
                 Arguments.of(null, null, null, 0, "127.0.0.1"),
                 Arguments.of("Moscow", "RUSSIA", "Lenina", 15, "172.0.32.11"),
@@ -31,14 +31,14 @@ class geoServiceTest {
     }
 
     @ParameterizedTest
-    @MethodSource("arguments")
-    public void byIpTest(String city, Country country, String street, int building, String ip) {
+    @MethodSource("argumentsForByIp")
+    public void byIp(String city, Country country, String street, int building, String ip) {
 
         Assertions.assertEquals(new Location(city, country, street, building), geoService.byIp(ip));
     }
 
     @Test
-    public void byCoordinatesTest() {
+    public void byCoordinates() {
 
         final double latitude = 222.0;
         final double longitud = 333.0;
@@ -48,30 +48,37 @@ class geoServiceTest {
         });
     }
 
-    @Test
-    public void LocalizationServiceTest() {
+    @ParameterizedTest
+    @CsvSource({"'Welcome', 'USA'", "'Добро пожаловать', 'RUSSIA'"})
+    public void LocalizationService(String expected, Country country) {
 
         LocalizationService localizationService = new LocalizationServiceImpl();
 
-        Assertions.assertEquals("Welcome", localizationService.locale(Country.USA));
+        Assertions.assertEquals(expected, localizationService.locale(country));
     }
 
-    @Test
-    public void sendTest() {
+    private static Stream<Arguments> argumentsForSend() {
+        return Stream.of(
+                Arguments.of("x-real-ip", "96.44.183.149", "New York", "USA", " 10th Avenue", 32, "Welcome"),
+                Arguments.of("x-real-ip", "172.0.32.11", "Moscow", "RUSSIA", "Lenina", 15, "Добро пожаловать")
+        );
+    }
 
-        final String NEW_YORK_IP = "96.44.183.149";
-        final String key = "";
+    @ParameterizedTest
+    @MethodSource("argumentsForSend")
+    public void send(String key, String ip, String city, Country country, String street, int building, String expected) {
+
         Map<String, String> headers = new HashMap<>();
-        headers.put(key, NEW_YORK_IP);
+        headers.put(key, ip);
 
         GeoService geoService = Mockito.mock(GeoService.class);
-        Mockito.when(geoService.byIp(NEW_YORK_IP)).thenReturn(new Location("New York", Country.USA, " 10th Avenue", 32));
+        Mockito.when(geoService.byIp(ip)).thenReturn(new Location("New York", Country.USA, " 10th Avenue", 32));
 
         LocalizationService localizationService = Mockito.mock(LocalizationService.class);
-        Mockito.when(localizationService.locale(Country.USA)).thenReturn("Welcome");
+        Mockito.when(localizationService.locale(Country.USA)).thenReturn(expected);
 
         MessageSender messageSender = new MessageSenderImpl(geoService, localizationService);
-        Assertions.assertEquals("Welcome", messageSender.send(headers));
+        Assertions.assertEquals(expected, messageSender.send(headers));
     }
 
 
